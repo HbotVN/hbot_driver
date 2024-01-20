@@ -1,0 +1,7 @@
+hbot_driver_node:
+  parameters:
+    port: /dev/myserial
+    timeout: 0.1
+    wheel_diameter: 0.1
+    wheel_base: 0.3
+    encoder_resolution: 1000
