@@ -1,0 +1,11 @@
+hbot_driver_yahboom_node:
+  parameters:
+    port: /dev/myserial
+    timeout: 0.1
+    wheel_diameter: 0.1
+    wheel_base: 0.3
+    encoder_resolution: 11
+    gear_ratio: 56
+    publish_odom_tf: true
+    publish_imu: true
+    imu_freq: 200
