@@ -6,10 +6,13 @@ from geometry_msgs.msg import TransformStamped
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Float32
 from sensor_msgs.msg import Imu
+from rclpy.parameter import ParameterType
+from rcl_interfaces.msg import ParameterDescriptor
 import tf2_ros
 import tf2_py as tf2
 
-from math import pi, sin, cos, tan, atan2, sqrt
+from math import sin, cos, pi
+import time
 
 # 1. Control the robot with cmd_vel
 # 2. Publish the odometry from the encoders
@@ -28,31 +31,50 @@ class MyNode(Node):
     super().__init__('hbot_driver_yahboom_node')
 
     # Declare parameters
-    self.declare_parameter('port', '/dev/myserial')
-    self.declare_parameter('baudrate', 115200)
-    self.declare_parameter('timeout', 0.002)
-    self.declare_parameter('wheel_base', 0.2)
-    self.declare_parameter('wheel_radius', 0.05)
-    self.declare_parameter('odom_frequency', 10)
-    self.declare_parameter('gear_ratio', 56)
-    self.declare_parameter('encoder_resolution', 11)
-    self.declare_parameter('publish_odom_tf', False)
-    self.declare_parameter('publish_imu', False)
-    self.declare_parameter('imu_frequency', 200)
+    self.declare_parameter(name='port', value="/dev/myserial",
+                           descriptor=ParameterDescriptor(type=ParameterType.PARAMETER_STRING, description="Serial port to connect to the robot"))
+    self.declare_parameter(name='debug', value=False,
+                           descriptor=ParameterDescriptor(type=ParameterType.PARAMETER_BOOL, description="Enable debug mode"))
+    self.declare_parameter(name='timeout', value=0.002,
+                           descriptor=ParameterDescriptor(type=ParameterType.PARAMETER_DOUBLE, description="Timeout for serial communication"))
+    self.declare_parameter(name='wheel_base', value=0.2,
+                           descriptor=ParameterDescriptor(type=ParameterType.PARAMETER_DOUBLE, description="Distance between 2 wheels"))
+    self.declare_parameter(name='wheel_diameter', value=0.05,
+                           descriptor=ParameterDescriptor(type=ParameterType.PARAMETER_DOUBLE, description="Wheel diameter"))
+    self.declare_parameter(name='odom_frequency', value=10,
+                           descriptor=ParameterDescriptor(type=ParameterType.PARAMETER_INTEGER, description="Frequency to publish odom data"))
+    self.declare_parameter(name='gear_ratio', value=56,
+                           descriptor=ParameterDescriptor(type=ParameterType.PARAMETER_INTEGER, description="Gear ratio"))
+    self.declare_parameter(name='encoder_resolution', value=11,
+                           descriptor=ParameterDescriptor(type=ParameterType.PARAMETER_INTEGER, description="Encoder resolution"))
+    self.declare_parameter(name='max_rpm', value=100,
+                           descriptor=ParameterDescriptor(type=ParameterType.PARAMETER_INTEGER, description="Max RPM"))
+    self.declare_parameter(name='publish_odom_tf', value=False,
+                           descriptor=ParameterDescriptor(type=ParameterType.PARAMETER_BOOL, description="Publish odom TF"))
+    self.declare_parameter(name='publish_imu', value=False,
+                           descriptor=ParameterDescriptor(type=ParameterType.PARAMETER_BOOL, description="Publish IMU data"))
+    self.declare_parameter(name='imu_frequency', value=200,
+                           descriptor=ParameterDescriptor(type=ParameterType.PARAMETER_INTEGER, description="Frequency to publish IMU data"))
 
     # Get parameters
-    _port = self.get_parameter('port').value
-    _timeout = self.get_parameter('timeout').value
-    self.__wheel_base = self.get_parameter('wheel_base').value
-    self.__wheel_radius = self.get_parameter('wheel_radius').value
-    self.__odome_freq = self.get_parameter('odom_frequency').value
-    self.__gear_ratio = self.get_parameter('gear_ratio').value
-    self.__encoder_resolution = self.get_parameter('encoder_resolution').value
-    self.__is_publish_odom_tf = self.get_parameter('publish_odom_tf').value
-    self.__is_publish_imu = self.get_parameter('publish_imu').value
-    self.__imu_freq = self.get_parameter('imu_frequency').value
+    _port = self.get_parameter('port').get_parameter_value().string_value
+    _debug = self.get_parameter('debug').get_parameter_value().bool_value
+    _timeout = self.get_parameter('timeout').get_parameter_value().double_value
+    self.__wheel_base = self.get_parameter('wheel_base').get_parameter_value().double_value
+    self.__wheel_diameter = self.get_parameter('wheel_diameter').get_parameter_value().double_value
+    self.__gear_ratio = self.get_parameter('gear_ratio').get_parameter_value().integer_value
+    self.__max_rpm = self.get_parameter('max_rpm').get_parameter_value().integer_value
+    self.__encoder_resolution = self.get_parameter('encoder_resolution').get_parameter_value().integer_value
+    self.__odome_freq = self.get_parameter('odom_frequency').get_parameter_value().integer_value
+    self.__is_publish_odom_tf = self.get_parameter('publish_odom_tf').get_parameter_value().bool_value
+    self.__is_publish_imu = self.get_parameter('publish_imu').get_parameter_value().bool_value
+    self.__imu_freq = self.get_parameter('imu_frequency').get_parameter_value().integer_value
 
-    self.bot = Rosmaster(1, _port, _timeout, True)
+    self.get_logger().info(f"Parameters: wheel_base: {self.__wheel_base}, wheel_diameter: {self.__wheel_diameter}, gear_ratio: {self.__gear_ratio}, encoder_resolution: {self.__encoder_resolution}, max_rpm: {self.__max_rpm}, odom_frequency: {self.__odome_freq}, publish_odom_tf: {self.__is_publish_odom_tf}, publish_imu: {self.__is_publish_imu}, imu_frequency: {self.__imu_freq}")
+
+    # Create Rosmaster object
+    self.get_logger().info(f"Connect to driver at {_port} with debug: {_debug}")
+    self.bot = Rosmaster(1, _port, _timeout, _debug)
     self.bot.create_receive_threading()
 
     # Create timer
@@ -79,28 +101,50 @@ class MyNode(Node):
     self.get_logger().info(f"Controller battery voltage: {self.bot.get_battery_voltage()}")
     self.bot.set_motor(0, 0, 0, 0) # Stop the robot
     self.__last_encoder_left, self.__last_encoder_right, _, _ = self.bot.get_motor_encoder()
+    self.__x = 0.0
+    self.__y = 0.0
+    self.__theta = 0.0
+
     # Beep 3 times to indicate that the robot is ready
     for i in range(3):
       self.bot.set_beep(100)
-      self.sleep(0.1)
+      time.sleep(0.2)
+
     # Idicate that the robot is ready by turning on the LED
     self.bot.set_colorful_effect(1, 5)
     self.get_logger().info("Init driver successful! - Yahboom controller ***************")
 
+  def vel_to_pwm(self, vel):
+    # convert linear vel (m/s) to rpm
+    rpm = vel * 60 / (3.14 * self.__wheel_diameter)
+    rpm = min(rpm, self.__max_rpm)
+    rpm = max(rpm, -self.__max_rpm)
+
+    # convert rpm to pwm
+    pwm =( rpm / self.__max_rpm) * 100
+    return int(pwm)
+
   def cmd_vel_callback(self, msg):
+    # self.get_logger().info(f"Received cmd_vel: {msg}")
     # Convert Twist message to vel_left and vel_right
     vel_linear = msg.linear.x
     vel_angular = msg.angular.z
 
-    vel_left = (2 * vel_linear - vel_angular * self.__wheel_base) / 2
-    vel_right = (2 * vel_linear + vel_angular * self.__wheel_base) / 2
+    vel_left = vel_linear - vel_angular * self.__wheel_base / 2
+    vel_right = vel_linear + vel_angular * self.__wheel_base / 2
 
-    self.bot.set_motor(vel_left, vel_right, 0, 0)
+    pwd_left = self.vel_to_pwm(vel_left)
+    pwd_right = - self.vel_to_pwm(vel_right)
+
+    self.bot.set_motor(pwd_left, pwd_right, 0, 0)
+    self.get_logger().info(f"Set motor: {vel_left}, {vel_right} | {vel_left * 60 / (3.14 * self.__wheel_diameter)} {vel_right * 60 / (3.14*self.__wheel_diameter) } | {pwd_left}, {pwd_right}")
 
   def odom_timer_callback(self):
     dt = 1.0 / self.__odome_freq
     # Get encoder data
     encoder_left, encoder_right, _, _ = self.bot.get_motor_encoder()
+    encoder_left = - encoder_left
+    encoder_right = encoder_right
 
     delta_enc_left = encoder_left - self.__last_encoder_left
     delta_enc_right = encoder_right - self.__last_encoder_right
@@ -113,8 +157,8 @@ class MyNode(Node):
     self.__last_encoder_right = encoder_right
 
     # Calculate odometry
-    delta_s_left = delta_enc_left * self.__wheel_radius / self.__ENCODER_CIRCLE
-    delta_s_right = delta_enc_right * self.__wheel_radius / self.__ENCODER_CIRCLE
+    delta_s_left = delta_enc_left * self.__wheel_diameter * pi /( self.__ENCODER_CIRCLE)
+    delta_s_right = delta_enc_right * self.__wheel_diameter * pi /( self.__ENCODER_CIRCLE)
 
     delta_s = (delta_s_left + delta_s_right) / 2
     delta_theta = (delta_s_right - delta_s_left) / self.__wheel_base
@@ -131,13 +175,13 @@ class MyNode(Node):
     odom_msg.header.frame_id = "odom"
     odom_msg.header.stamp = self.get_clock().now().to_msg()
     odom_msg.twist.twist.linear.x = delta_x / dt
-    odom_msg.twist.twist.linear.y = 0
+    odom_msg.twist.twist.linear.y = 0.0
     odom_msg.twist.twist.angular.z = delta_theta / dt
     odom_msg.pose.pose.position.x = self.__x
     odom_msg.pose.pose.position.y = self.__y
-    odom_msg.pose.pose.position.z = 0
-    odom_msg.pose.pose.orientation.x = 0
-    odom_msg.pose.pose.orientation.y = 0
+    odom_msg.pose.pose.position.z = 0.0
+    odom_msg.pose.pose.orientation.x = 0.0
+    odom_msg.pose.pose.orientation.y = 0.0
     odom_msg.pose.pose.orientation.z = sin(self.__theta / 2)
     odom_msg.pose.pose.orientation.w = cos(self.__theta / 2)
 
@@ -151,9 +195,9 @@ class MyNode(Node):
       odom_tf_msg.child_frame_id = "base_link"
       odom_tf_msg.transform.translation.x = self.__x
       odom_tf_msg.transform.translation.y = self.__y
-      odom_tf_msg.transform.translation.z = 0
-      odom_tf_msg.transform.rotation.x = 0
-      odom_tf_msg.transform.rotation.y = 0
+      odom_tf_msg.transform.translation.z = 0.0
+      odom_tf_msg.transform.rotation.x = 0.0
+      odom_tf_msg.transform.rotation.y = 0.0
       odom_tf_msg.transform.rotation.z = sin(self.__theta / 2)
       odom_tf_msg.transform.rotation.w = cos(self.__theta / 2)
 

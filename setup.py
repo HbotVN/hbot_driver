@@ -10,6 +10,8 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        ('share/' + package_name + '/config', ['config/params.yaml']),
+        ('share/' + package_name + '/launch', ['launch/hbot_driver.launch.py']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -20,6 +22,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'hbot_driver_yahboom_node = hbot_driver_yahboom.hbot_driver_yahboom:main',
         ],
     },
 )
