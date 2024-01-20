@@ -91,6 +91,7 @@ class MyNode(Node):
     self.batery_percent_pub = self.create_publisher(Float32, 'battery/percent', 10)
     if self.__is_publish_odom_tf:
       self.odom_tf_pub = self.create_publisher(TransformStamped, 'odom_tf', 10)
+      self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
     if self.__is_publish_imu:
       self.imu_pub = self.create_publisher(Imu, 'imu', 10)
 
@@ -101,6 +102,7 @@ class MyNode(Node):
     self.get_logger().info(f"Controller battery voltage: {self.bot.get_battery_voltage()}")
     self.bot.set_motor(0, 0, 0, 0) # Stop the robot
     self.__last_encoder_left, self.__last_encoder_right, _, _ = self.bot.get_motor_encoder()
+    self.__last_encoder_left = - self.__last_encoder_left
     self.__x = 0.0
     self.__y = 0.0
     self.__theta = 0.0
@@ -130,8 +132,8 @@ class MyNode(Node):
     vel_linear = msg.linear.x
     vel_angular = msg.angular.z
 
-    vel_left = vel_linear - vel_angular * self.__wheel_base / 2
-    vel_right = vel_linear + vel_angular * self.__wheel_base / 2
+    vel_left = vel_linear - vel_angular * self.__wheel_base / 2.0
+    vel_right = vel_linear + vel_angular * self.__wheel_base / 2.0
 
     pwd_left = self.vel_to_pwm(vel_left)
     pwd_right = - self.vel_to_pwm(vel_right)
@@ -190,18 +192,14 @@ class MyNode(Node):
     # Publish TF
     if self.__is_publish_odom_tf:
       odom_tf_msg = TransformStamped()
-      odom_tf_msg.header.stamp = self.get_clock().now().to_msg()
-      odom_tf_msg.header.frame_id = "odom"
+      odom_tf_msg.header.stamp = odom_msg.header.stamp
+      odom_tf_msg.header.frame_id = odom_msg.header.frame_id
       odom_tf_msg.child_frame_id = "base_link"
-      odom_tf_msg.transform.translation.x = self.__x
-      odom_tf_msg.transform.translation.y = self.__y
-      odom_tf_msg.transform.translation.z = 0.0
-      odom_tf_msg.transform.rotation.x = 0.0
-      odom_tf_msg.transform.rotation.y = 0.0
-      odom_tf_msg.transform.rotation.z = sin(self.__theta / 2)
-      odom_tf_msg.transform.rotation.w = cos(self.__theta / 2)
-
-      self.odom_tf_pub.publish(odom_tf_msg)
+      odom_tf_msg.transform.translation.x = odom_msg.pose.pose.position.x
+      odom_tf_msg.transform.translation.y = odom_msg.pose.pose.position.y
+      odom_tf_msg.transform.translation.z = odom_msg.pose.pose.position.z
+      odom_tf_msg.transform.rotation = odom_msg.pose.pose.orientation
+      self.tf_broadcaster.sendTransform(odom_tf_msg)
 
     # Publish battery voltage
     battery_vol_msg = Float32()
