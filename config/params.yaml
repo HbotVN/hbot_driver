@@ -12,3 +12,4 @@ hbot_driver_yahboom_node:
     publish_odom_tf: true
     publish_imu: false
     imu_freq: 200
+    robot_base_frame: base_footprint

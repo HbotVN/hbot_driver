@@ -55,6 +55,8 @@ class MyNode(Node):
                            descriptor=ParameterDescriptor(type=ParameterType.PARAMETER_BOOL, description="Publish IMU data"))
     self.declare_parameter(name='imu_frequency', value=200,
                            descriptor=ParameterDescriptor(type=ParameterType.PARAMETER_INTEGER, description="Frequency to publish IMU data"))
+    self.declare_parameter(name='robot_base_frame', value="base_link",
+                           descriptor=ParameterDescriptor(type=ParameterType.PARAMETER_STRING, description="Robot base frame"))
 
     # Get parameters
     _port = self.get_parameter('port').get_parameter_value().string_value
@@ -69,6 +71,7 @@ class MyNode(Node):
     self.__is_publish_odom_tf = self.get_parameter('publish_odom_tf').get_parameter_value().bool_value
     self.__is_publish_imu = self.get_parameter('publish_imu').get_parameter_value().bool_value
     self.__imu_freq = self.get_parameter('imu_frequency').get_parameter_value().integer_value
+    self.__robot_base_frame = self.get_parameter('robot_base_frame').get_parameter_value().string_value
 
     self.get_logger().info(f"Parameters: wheel_base: {self.__wheel_base}, wheel_diameter: {self.__wheel_diameter}, gear_ratio: {self.__gear_ratio}, encoder_resolution: {self.__encoder_resolution}, max_rpm: {self.__max_rpm}, odom_frequency: {self.__odome_freq}, publish_odom_tf: {self.__is_publish_odom_tf}, publish_imu: {self.__is_publish_imu}, imu_frequency: {self.__imu_freq}")
 
@@ -194,7 +197,7 @@ class MyNode(Node):
       odom_tf_msg = TransformStamped()
       odom_tf_msg.header.stamp = odom_msg.header.stamp
       odom_tf_msg.header.frame_id = odom_msg.header.frame_id
-      odom_tf_msg.child_frame_id = "base_link"
+      odom_tf_msg.child_frame_id = self.__robot_base_frame
       odom_tf_msg.transform.translation.x = odom_msg.pose.pose.position.x
       odom_tf_msg.transform.translation.y = odom_msg.pose.pose.position.y
       odom_tf_msg.transform.translation.z = odom_msg.pose.pose.position.z
