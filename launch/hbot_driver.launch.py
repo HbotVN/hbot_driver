@@ -5,6 +5,7 @@ from launch.actions import DeclareLaunchArgument
 from ament_index_python.packages import get_package_share_directory
 from nav2_common.launch import RewrittenYaml
 import launch_ros.actions
+from launch_ros.descriptions import ParameterFile
 import yaml
 
 def generate_launch_description():
@@ -21,7 +22,7 @@ def generate_launch_description():
   )
   params_file_arg = DeclareLaunchArgument('params_file',
                                          default_value=os.path.join(
-                                           get_package_share_directory(package_name),
+                                           get_package_share_directory('hbot_driver_yahboom'),
                                            'config',
                                            'params.yaml'
                                          ),
@@ -31,16 +32,19 @@ def generate_launch_description():
     'debug': debug
   }
 
-  configured_params = RewrittenYaml(
-    source_file=params_file,
-    root_key='',
-    param_rewrites=param_subsitutions,
-    convert_types=True
+  configured_params = ParameterFile(
+    RewrittenYaml(
+      source_file=params_file,
+      root_key='',
+      param_rewrites=param_subsitutions,
+      convert_types=True
+    ),
+    allow_substs=True
   )
 
   node = launch_ros.actions.Node(
-    package=package_name,
-    executable=node_name,
+    package='hbot_driver_yahboom',
+    executable='hbot_driver_yahboom_node',
     output='screen',
     parameters=[configured_params]
   )

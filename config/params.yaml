@@ -9,7 +9,7 @@ hbot_driver_yahboom_node:
     gear_ratio: 56
     max_rpm: 205
     odom_frequency : 20
-    publish_odom_tf: true
-    publish_imu: false
+    publish_odom_tf: True
+    publish_imu: False
     imu_freq: 200
     robot_base_frame: base_footprint
