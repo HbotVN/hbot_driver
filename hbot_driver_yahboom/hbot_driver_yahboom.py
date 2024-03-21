@@ -150,9 +150,9 @@ class MyNode(Node):
     encoder_left, encoder_right, _, _ = self.bot.get_motor_encoder()
     encoder_left = - encoder_left
     encoder_right = encoder_right
-
     delta_enc_left = encoder_left - self.__last_encoder_left
     delta_enc_right = encoder_right - self.__last_encoder_right
+    self.get_logger().info(f"delta_enc_left: {delta_enc_left}, delta_enc_right: {delta_enc_right}")
     if (abs(delta_enc_left) > self.__ENCODER_CIRCLE):
       delta_enc_left = (delta_enc_left - MAX_ENCODER_VALUE * 2) if (delta_enc_left > 0) else (delta_enc_left + MAX_ENCODER_VALUE * 2)
     if (abs(delta_enc_right) > self.__ENCODER_CIRCLE):
@@ -164,22 +164,23 @@ class MyNode(Node):
     # Calculate odometry
     delta_s_left = delta_enc_left * self.__wheel_diameter * pi /( self.__ENCODER_CIRCLE)
     delta_s_right = delta_enc_right * self.__wheel_diameter * pi /( self.__ENCODER_CIRCLE)
+    self.get_logger().info(f"delta_s_left: {delta_s_left}, delta_s_right: {delta_s_right}")
 
     delta_s = (delta_s_left + delta_s_right) / 2
     delta_theta = (delta_s_right - delta_s_left) / self.__wheel_base
 
-    delta_x = delta_s * cos(delta_theta)
-    delta_y = delta_s * sin(delta_theta)
-
-    self.__x += delta_x
-    self.__y += delta_y
     self.__theta += delta_theta
+    self.__x += delta_s * cos(self.__theta)
+    self.__y += delta_s * sin(self.__theta)
+
+    # Normalize theta
+    self.__theta = (self.__theta + pi) % (2 * pi) - pi
 
     # Publish odometry
     odom_msg = Odometry()
     odom_msg.header.frame_id = "odom"
     odom_msg.header.stamp = self.get_clock().now().to_msg()
-    odom_msg.twist.twist.linear.x = delta_x / dt
+    odom_msg.twist.twist.linear.x = delta_s / dt
     odom_msg.twist.twist.linear.y = 0.0
     odom_msg.twist.twist.angular.z = delta_theta / dt
     odom_msg.pose.pose.position.x = self.__x

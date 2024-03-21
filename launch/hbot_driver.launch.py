@@ -14,6 +14,7 @@ def generate_launch_description():
 
   debug =  LaunchConfiguration('debug')
   params_file = LaunchConfiguration('params_file')
+  log_level = LaunchConfiguration('log_level')
 
   debug_arg = DeclareLaunchArgument(
     'debug',
@@ -27,6 +28,10 @@ def generate_launch_description():
                                            'params.yaml'
                                          ),
                                           description='Path to the ROS2 parameters file to use.')
+
+  declare_log_level_cmd = DeclareLaunchArgument(
+        'log_level', default_value='info',
+        description='log level')
 
   param_subsitutions = {
     'debug': debug
@@ -46,12 +51,14 @@ def generate_launch_description():
     package='hbot_driver_yahboom',
     executable='hbot_driver_yahboom_node',
     output='screen',
-    parameters=[configured_params]
+    parameters=[configured_params],
+    arguments=['--ros-args', '--log-level', log_level]
   )
 
   ld = LaunchDescription()
   ld.add_action(debug_arg)
   ld.add_action(params_file_arg)
+  ld.add_action(declare_log_level_cmd)
 
   ld.add_action(node)
 
