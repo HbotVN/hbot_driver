@@ -152,7 +152,7 @@ class MyNode(Node):
     encoder_right = encoder_right
     delta_enc_left = encoder_left - self.__last_encoder_left
     delta_enc_right = encoder_right - self.__last_encoder_right
-    self.get_logger().info(f"delta_enc_left: {delta_enc_left}, delta_enc_right: {delta_enc_right}")
+    # self.get_logger().info(f"delta_enc_left: {delta_enc_left}, delta_enc_right: {delta_enc_right}")
     if (abs(delta_enc_left) > self.__ENCODER_CIRCLE):
       delta_enc_left = (delta_enc_left - MAX_ENCODER_VALUE * 2) if (delta_enc_left > 0) else (delta_enc_left + MAX_ENCODER_VALUE * 2)
     if (abs(delta_enc_right) > self.__ENCODER_CIRCLE):
@@ -164,7 +164,7 @@ class MyNode(Node):
     # Calculate odometry
     delta_s_left = delta_enc_left * self.__wheel_diameter * pi /( self.__ENCODER_CIRCLE)
     delta_s_right = delta_enc_right * self.__wheel_diameter * pi /( self.__ENCODER_CIRCLE)
-    self.get_logger().info(f"delta_s_left: {delta_s_left}, delta_s_right: {delta_s_right}")
+    # self.get_logger().info(f"delta_s_left: {delta_s_left}, delta_s_right: {delta_s_right}")
 
     delta_s = (delta_s_left + delta_s_right) / 2
     delta_theta = (delta_s_right - delta_s_left) / self.__wheel_base
